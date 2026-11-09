@@ -5,7 +5,7 @@ import { Modal, Toggle } from "../components/ui";
 import LinePicker from "../components/LinePicker";
 import { autoLineEnabled, pickLine, setAutoLine } from "../autoLine";
 import { copyPlaybackLog, initPlaybackLog, setPlaybackLog, usePlaybackLog } from "../playbackDiagnostics";
-import { IBack, IBoltF, IBroom, IChevR, IHeart, IInfo, ILink, ILockF, IMoon, IRefresh, ISettings, ISun, IVolMute } from "../icons";
+import { IBack, IBoltF, IBroom, IChevR, IDownload, IHeart, IInfo, ILink, ILockF, IMoon, IRefresh, ISettings, ISun, IVolMute } from "../icons";
 
 /* 独立设置页：线路 / 外观 / 播放 / 本地数据 / 清理缓存 / 网络诊断 / 关于
    入口：Windows 侧栏「设置」、Android「我的」右上角齿轮 */
@@ -128,6 +128,14 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
               <div className="flex-1">
                 <div className="text-[12.5px] text-on">清理缓存</div>
                 <div className="text-[10.5px] text-mut">封面 / 播放缓存与本地记录</div>
+              </div>
+              <IChevR size={15} className="text-mut" />
+            </button>
+            <button onClick={() => api.revealDownloadDir().catch(() => toast("打开下载目录失败", "info"))} className="w-full flex items-center gap-3 px-3.5 py-3 text-left pressable">
+              <span className="w-8 h-8 rounded-full bg-s3 flex items-center justify-center text-primary"><IDownload size={16} /></span>
+              <div className="flex-1">
+                <div className="text-[12.5px] text-on">下载目录</div>
+                <div className="text-[10.5px] text-mut">查看已下载到本地的视频文件</div>
               </div>
               <IChevR size={15} className="text-mut" />
             </button>

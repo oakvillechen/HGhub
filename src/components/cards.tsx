@@ -5,13 +5,13 @@ import { IHeartF, IPlayF } from "../icons";
 import { Img } from "./ui";
 
 /* ——— 瀑布流卡片 ——— */
-export function WaterfallCard({ v, onOpen }: { v: VideoCard; onOpen: () => void }) {
+export function WaterfallCard({ v, onOpen, eager = false }: { v: VideoCard; onOpen: () => void; eager?: boolean }) {
   const ratio = 1.32;
   return (
     <button onClick={onOpen}
       className="relative w-full overflow-hidden text-left bg-s1 elev-1 pressable block rounded-(--r-sm)"
       style={{ paddingTop: `${ratio * 100}%` }}>
-      <Img src={v.cover} />
+      <Img src={v.cover} eager={eager} />
       <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
       <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold brand-grad elev-1">
         {v.is_finished ? "已完结" : `更新至${v.episode_count}集`}
@@ -31,15 +31,14 @@ export function WaterfallCard({ v, onOpen }: { v: VideoCard; onOpen: () => void 
 }
 
 /* ——— 近无缝瀑布流 ——— */
-export function Masonry({ videos, onOpen, wide = false, gap = "gap-1" }: {
+export function Masonry({ videos, onOpen, wide = false, gap = "gap-2" }: {
   videos: VideoCard[]; onOpen: (v: VideoCard) => void; wide?: boolean; gap?: string;
 }) {
-  const mb = gap === "gap-1" ? "mb-1" : "mb-1.5";
   return (
-    <div className={`${wide ? "columns-3 xl:columns-4" : "columns-2"} ${gap} [column-fill:balance]`}>
-      {videos.map((v) => (
-        <div key={v.id} className={`break-inside-avoid ${mb}`}>
-          <WaterfallCard v={v} onOpen={() => onOpen(v)} />
+    <div className={`grid ${wide ? "grid-cols-3 xl:grid-cols-4" : "grid-cols-2"} ${gap}`}>
+      {videos.map((v, idx) => (
+        <div key={v.id}>
+          <WaterfallCard v={v} onOpen={() => onOpen(v)} eager={idx < 12} />
         </div>
       ))}
     </div>

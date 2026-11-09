@@ -3,7 +3,7 @@ import { api, APP_VERSION, fmt, fmtTime, isMobile, platform } from "../api";
 import type { Detail } from "../types";
 import { useStore } from "../store";
 import { Avatar, Empty, Img } from "../components/ui";
-import { IChevR, IClock, ILogout, ISettings, IStar, IUser } from "../icons";
+import { IChevR, IClock, IDownload, ILogout, ISettings, IStar, IUser } from "../icons";
 
 /* 我的：结构固定（资料卡 + 我的收藏 / 观看历史）。
    收藏与观看记录都存在本地，所以未登录也照常展示；未登录时资料卡本身就是登录入口。 */
@@ -34,12 +34,18 @@ export default function Profile({ wide }: { wide: boolean }) {
     <div className="absolute inset-0 bg-bg flex flex-col">
       <div className="shrink-0 px-4 pb-2 flex items-center" style={{ paddingTop: "calc(var(--sat, 0px) + 14px)" }}>
         <div className="text-[24px] font-bold text-on leading-none">我的</div>
-        {isMobile && (
-          <button onClick={() => push({ kind: "settings" })} aria-label="设置"
-            className="ml-auto w-9 h-9 rounded-full bg-s3 flex items-center justify-center text-mut pressable">
-            <ISettings size={17} strokeWidth={1.7} />
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={() => api.revealDownloadDir()} aria-label="下载目录" title="打开下载目录"
+            className="w-9 h-9 rounded-full bg-s3 flex items-center justify-center text-mut pressable">
+            <IDownload size={17} strokeWidth={1.7} />
           </button>
-        )}
+          {isMobile && (
+            <button onClick={() => push({ kind: "settings" })} aria-label="设置"
+              className="w-9 h-9 rounded-full bg-s3 flex items-center justify-center text-mut pressable">
+              <ISettings size={17} strokeWidth={1.7} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 scroll-y px-4 pt-2 pb-24">

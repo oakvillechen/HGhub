@@ -4,27 +4,64 @@ import { handleArticleClick, sanitizeHtml } from "../html";
 import type { Comment, CommentPage, Episode } from "../types";
 import { useStore } from "../store";
 import { Avatar, Empty } from "./ui";
-import { IClose, IHeart, ISendF } from "../icons";
+import { triggerBatchDownload, useDownloadTasks } from "./DownloadManager";
+import { IClose, IDownload, IHeart, ISendF } from "../icons";
 
 /* ================= 选集 ================= */
-export function EpisodesPanel({ videoId, episodes, current, onPick, onClose, bare = false }: {
-  videoId: number; episodes: Episode[]; current: number; onPick: (ep: number) => void; onClose: () => void;
+export function EpisodesPanel({
+  videoId, episodes, current, seriesTitle = "短剧", onPick, onClose, bare = false,
+}: {
+  videoId: number; episodes: Episode[]; current: number; seriesTitle?: string; onPick: (ep: number) => void; onClose: () => void;
   /** 嵌在双栏抽屉里时，隐藏自带的标题栏与底注 */
   bare?: boolean;
 }) {
+  const { toast } = useStore();
+  const { isBatchDownloading } = useDownloadTasks();
   const [asc, setAsc] = useState(true);
   const list = asc ? episodes : [...episodes].reverse();
+  const isDownloading = isBatchDownloading(videoId);
+
+  const handleDownloadAll = () => {
+    if (isDownloading) {
+      toast("全集正在下载中", "info");
+      return;
+    }
+    const eps = episodes.map((e) => e.ep_num).sort((a, b) => a - b);
+    triggerBatchDownload(videoId, seriesTitle, eps);
+    toast(`已开始下载《${seriesTitle}》全集（共 ${eps.length} 集）`, "ok");
+  };
+
   return (
     <div className="flex flex-col h-full">
       {bare ? (
         <div className="shrink-0 flex items-center gap-2 px-4 pb-2">
           <span className="text-[10.5px] text-mut">共 {episodes.length} 集</span>
+          {episodes.length > 1 && (
+            <button
+              onClick={handleDownloadAll}
+              disabled={isDownloading}
+              className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/15 text-primary hover:bg-primary/25 pressable flex items-center gap-1 disabled:opacity-50"
+            >
+              <IDownload size={12} />
+              <span>{isDownloading ? "下载中…" : "下载全集"}</span>
+            </button>
+          )}
           <button onClick={() => setAsc((v) => !v)} className="ml-auto text-[11px] text-primary pressable">{asc ? "倒序" : "正序"}</button>
         </div>
       ) : (
         <div className="shrink-0 flex items-center gap-2 px-4 h-12">
           <span className="text-[13.5px] font-bold text-on">选集</span>
           <span className="text-[10.5px] text-mut">共 {episodes.length} 集</span>
+          {episodes.length > 1 && (
+            <button
+              onClick={handleDownloadAll}
+              disabled={isDownloading}
+              className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/15 text-primary hover:bg-primary/25 pressable flex items-center gap-1 disabled:opacity-50"
+            >
+              <IDownload size={13} />
+              <span>{isDownloading ? "全集下载中…" : "下载全集"}</span>
+            </button>
+          )}
           <button onClick={() => setAsc((v) => !v)} className="ml-auto text-[11px] text-primary pressable">{asc ? "倒序" : "正序"}</button>
           <button onClick={onClose} aria-label="关闭" className="w-7 h-7 rounded-full bg-s3 flex items-center justify-center text-mut pressable">
             <IClose size={13} />

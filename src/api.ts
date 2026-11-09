@@ -166,6 +166,32 @@ export const api = {
   downloadUpdate: (url: string, name: string) => call<string>("download_update", { url, name }),
   installUpdate: (path: string) => call<void>("install_update", { path }),
   openUrl: (url: string) => call<void>("open_url", { url }),
+
+  /* 本地视频下载 */
+  downloadVideo: (id: string, title: string, url: string, subDir?: string) =>
+    call<DownloadTask>("download_video", { id, title, url, subDir: subDir ?? null }),
+  downloadStatus: (id: string) =>
+    call<DownloadTask | null>("download_status", { id }),
+  cancelDownload: (id: string) =>
+    invoke<void>("cancel_download", { id }),
+  openDownloadItem: (path: string) =>
+    call<void>("open_download_item", { path }),
+  revealDownloadItem: (path: string) =>
+    call<void>("reveal_download_item", { path }),
+  revealDownloadDir: (subDir?: string) =>
+    call<void>("reveal_download_dir", { subDir: subDir ?? null }),
+};
+
+export type DownloadTask = {
+  id: string;
+  title: string;
+  status: "downloading" | "completed" | "error" | "cancelled";
+  progress: number;
+  total_segments: number;
+  downloaded_segments: number;
+  file_path?: string;
+  error?: string;
+  sub_dir?: string;
 };
 
 /* ── 更新检查 ───────────────────────────────────────────── */

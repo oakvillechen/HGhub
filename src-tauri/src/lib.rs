@@ -1,4 +1,5 @@
 mod api;
+mod download;
 mod lines;
 #[cfg(target_os = "linux")]
 mod linux_http;
@@ -181,6 +182,12 @@ pub fn run() {
             api::api_like,
             api::api_collect,
             api::api_follow,
+            download::download_video,
+            download::download_status,
+            download::cancel_download,
+            download::open_download_item,
+            download::reveal_download_item,
+            download::reveal_download_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -186,12 +186,31 @@ export function Img({ src, alt = "", className = "", eager = false, raw = false 
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState(false);
   const url = raw ? src : cover(src);
+
+  useEffect(() => {
+    setOk(false);
+    setErr(false);
+  }, [url]);
+
   return (
     <div className={`absolute inset-0 overflow-hidden ${className}`}>
       {!ok && !err && <div className="absolute inset-0 shimmer" />}
       {err && <div className="absolute inset-0 bg-s3" />}
-      <img src={url} alt={alt} loading={eager ? "eager" : "lazy"} onLoad={() => setOk(true)} onError={() => setErr(true)}
-        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ok ? "opacity-100" : "opacity-0"}`} draggable={false} />
+      <img
+        ref={(el) => {
+          if (el && el.complete && el.naturalWidth > 0 && !ok) {
+            setOk(true);
+          }
+        }}
+        src={url}
+        alt={alt}
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        onLoad={() => setOk(true)}
+        onError={() => setErr(true)}
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${ok ? "opacity-100" : "opacity-0"}`}
+        draggable={false}
+      />
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useStore, type Tab } from "../store";
-import { APP_VERSION } from "../api";
+import { APP_VERSION, api } from "../api";
 import { Avatar } from "./ui";
 import {
-  IClose, IGrid, IGridF, IHome, IHomeF, IMinus, IMoon, IRestore, ISearch, ISettings, ISidebar,
+  IClose, IDownload, IGrid, IGridF, IHome, IHomeF, IMinus, IMoon, IRestore, ISearch, ISettings, ISidebar,
   ISquare, ISun, ITrophy, IUser, IUserF, Logo,
 } from "../icons";
 
@@ -100,6 +100,11 @@ export function DesktopRail({ collapsed }: { collapsed: boolean }) {
             onClick={() => { if (railPage !== "settings") push({ kind: "settings" }); }}>
             <span className="win-nav-symbol"><ISettings size={21} strokeWidth={1.7} /></span>
             <span className="win-nav-copy">设置</span>
+          </button>
+          <button className="win-nav-item" title="打开下载目录"
+            onClick={() => api.revealDownloadDir()}>
+            <span className="win-nav-symbol"><IDownload size={21} strokeWidth={1.7} /></span>
+            <span className="win-nav-copy">下载目录</span>
           </button>
         </div>
         <div className="win-sidebar-bottom">

@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, cover, fmt, fmtTime, isMobile, logLine, mediaUrl } from "../api";
 import type { Detail, Episode, Post, VideoCard } from "../types";
 import { useStore } from "../store";
-import { Avatar, Img, Sheet } from "./ui";
+import { Avatar, Img, Modal, Sheet } from "./ui";
 import VideoSurface, { type VideoHandle } from "./VideoSurface";
 import PlayerControls from "./PlayerControls";
 import PlaybackLock from "./PlaybackLock";
 import { ArticlePanel, CommentsPanel, EpisodesPanel } from "./Panels";
 import { setBackHandler } from "../back";
+import { triggerBatchDownload, triggerDownload } from "./DownloadManager";
 import {
-  IBack, IBoltF, IChevR, IChevronDown, IChevronUp, IClose, ICommentF, ICompress, IExpand, IFileText, IHeart, IHeartF,
+  IBack, IBoltF, IChevR, IChevronDown, IChevronUp, IClose, ICommentF, ICompress, IDownload, IExpand, IFileText, IHeart, IHeartF,
   ILink, IList, ILockF, IPauseF, IPlayF, ISearch, IStar, IStarF, IVol, IVolMute,
 } from "../icons";
 
@@ -56,6 +57,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
   const [waiting, setWaiting] = useState(false);
   const [err, setErr] = useState("");
   const [panel, setPanel] = useState<"episodes" | "comments" | "article" | "detail" | null>(null);
+  const [downloadModal, setDownloadModal] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
   /* 续播：拿到时长后再 seek 一次（只对进入时那一条生效） */
   const resumeRef = useRef<{ key: string; t: number } | null>(
@@ -173,6 +175,44 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
   const shareLink = () => {
     const u = kind === "post" ? (posts[curId]?.video_url || meta.title) : `https://huangguoai.com/video/${curId}/`;
     navigator.clipboard?.writeText(u).then(() => toast("链接已复制", "ok")).catch(() => {});
+  };
+
+  /* 视频下载 */
+  const downloadCurrentEp = async () => {
+    try {
+      let url = playUrl;
+      if (!url && curId) {
+        const info = await api.play(curId, curEp);
+        url = info?.streams?.main || info?.video_url || "";
+      }
+      if (!url) {
+        toast("暂未获取到播放地址", "info");
+        return;
+      }
+      const seriesTitle = detail?.title || (kind === "post" ? posts[curId]?.title : cards[curId]?.title) || title || "视频";
+      const padLen = episodes.length >= 100 ? 3 : episodes.length >= 10 ? 2 : 1;
+      const fileTitle = episodes.length > 1 ? `${seriesTitle}_第${String(curEp).padStart(padLen, "0")}集` : seriesTitle;
+      const taskId = `dl_${curId}_${curEp}`;
+      await triggerDownload(fileTitle, url, taskId, episodes.length > 1 ? seriesTitle : undefined);
+      toast("已开始下载: " + fileTitle, "ok");
+    } catch (e) {
+      toast("下载失败: " + ((e as Error).message || ""), "info");
+    }
+  };
+
+  const downloadAllEpisodes = () => {
+    const seriesTitle = detail?.title || (kind === "post" ? posts[curId]?.title : cards[curId]?.title) || title || "短剧";
+    const eps = episodes.map((e) => e.ep_num).sort((a, b) => a - b);
+    triggerBatchDownload(curId, seriesTitle, eps);
+    toast(`已开始下载《${seriesTitle}》全集（共 ${eps.length} 集）`, "ok");
+  };
+
+  const onDownload = () => {
+    if (episodes.length > 1) {
+      setDownloadModal(true);
+    } else {
+      downloadCurrentEp();
+    }
   };
 
   /* 倍速：长按 / 锁定 → 2.0x，否则用基准倍速 */
@@ -624,6 +664,10 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                     <IExpand size={26} className="hg-ink hg-ov-shadow" />
                     <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">全屏</span>
                   </button>
+                  <button onClick={onDownload} className="flex flex-col items-center gap-1 pressable" aria-label="下载">
+                    <IDownload size={26} className="hg-ink hg-ov-shadow" />
+                    <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">下载</span>
+                  </button>
                   <button onClick={shareLink} className="flex flex-col items-center gap-1 pressable" aria-label="分享">
                     <ILink size={25} className="hg-ink hg-ov-shadow" />
                     <span className="text-[10.5px] hg-ink-2 hg-ov-shadow">分享</span>
@@ -673,6 +717,11 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                 <button onClick={shareLink} className="flex flex-col items-center gap-1 pressable">
                   <ILink size={25} className="text-white tsh" />
                   <span className="text-[10.5px] text-white/90">分享</span>
+                </button>
+
+                <button onClick={onDownload} className="flex flex-col items-center gap-1 pressable" title="下载到本地">
+                  <IDownload size={25} className="text-white tsh" />
+                  <span className="text-[10.5px] text-white/90">下载</span>
                 </button>
               </div>
               )}
@@ -867,7 +916,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
         <div className={`desktop-dock-panel ${panel ? "is-open" : ""}`}>
           <div className="desktop-dock-inner">
             {panel === "episodes" ? (
-              <EpisodesPanel videoId={curId} episodes={episodes} current={curEp} onPick={pickEp} onClose={() => setPanel(null)} />
+              <EpisodesPanel videoId={curId} episodes={episodes} current={curEp} seriesTitle={meta.title} onPick={pickEp} onClose={() => setPanel(null)} />
             ) : panel === "comments" ? (
               <CommentsPanel videoId={curId} ep={curEp} total={meta.comment} kind={kind} onClose={() => setPanel(null)} />
             ) : null}
@@ -908,7 +957,7 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
 
               <div className="flex-1 min-h-0">
                 {panel === "episodes" ? (
-                  <EpisodesPanel bare videoId={curId} episodes={episodes} current={curEp} onPick={pickEp} onClose={() => setPanel(null)} />
+                  <EpisodesPanel bare videoId={curId} episodes={episodes} current={curEp} seriesTitle={meta.title} onPick={pickEp} onClose={() => setPanel(null)} />
                 ) : (
                   <div className="h-full scroll-y px-4 pb-5">
                     {/* 封面 / 标题 / 评分 / 数据 */}
@@ -971,6 +1020,40 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
         </div>
       )}
       {controlsLocked && <PlaybackLock active={active} onUnlock={() => { setControlsLocked(false); wake(); }} />}
+
+      <Modal open={downloadModal} onClose={() => setDownloadModal(false)} width={320}>
+        <div className="p-5">
+          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+            <div className="text-[14.5px] font-bold text-on">下载短剧</div>
+            <button onClick={() => setDownloadModal(false)} className="w-7 h-7 rounded-full bg-s4 flex items-center justify-center text-mut pressable">
+              <IClose size={14} />
+            </button>
+          </div>
+          <p className="text-[12px] text-mut mt-2.5 truncate font-medium">《{detail?.title || title || "短剧"}》</p>
+          <div className="flex flex-col gap-2.5 mt-4">
+            <button
+              onClick={() => {
+                setDownloadModal(false);
+                downloadCurrentEp();
+              }}
+              className="w-full h-10 rounded-xl bg-s4 hover:bg-s4/80 text-[13px] font-medium text-on flex items-center justify-between px-3.5 pressable"
+            >
+              <span>下载当前集</span>
+              <span className="text-[11.5px] text-primary">第 {curEp} 集</span>
+            </button>
+            <button
+              onClick={() => {
+                setDownloadModal(false);
+                downloadAllEpisodes();
+              }}
+              className="w-full h-10 rounded-xl bg-primary text-on-primary hover:brightness-110 text-[13px] font-bold flex items-center justify-between px-3.5 pressable shadow-lg shadow-primary/20"
+            >
+              <span>下载整部全集</span>
+              <span className="text-[11.5px] opacity-90">共 {episodes.length} 集</span>
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

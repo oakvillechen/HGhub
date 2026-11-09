@@ -4,7 +4,8 @@ import type { Post } from "../types";
 import { useStore } from "../store";
 import { Empty, Img } from "../components/ui";
 import Player from "../components/Player";
-import { IBack, IFireF, IPlayF } from "../icons";
+import { triggerDownload } from "../components/DownloadManager";
+import { IBack, IDownload, IFireF, IPlayF } from "../icons";
 import { handleArticleClick, sanitizeHtml } from "../html";
 
 /* ================= 吃瓜列表 ================= */
@@ -107,6 +108,16 @@ export function PostDetail({ id, onBack, active = true }: { id: number; onBack: 
     return () => { alive = false; };
   }, [id]);
 
+  const onDownload = async () => {
+    if (!post?.video_url) return;
+    try {
+      await triggerDownload(post.title || "吃瓜视频", post.video_url, `dl_post_${post.id}`);
+      toast("已开始下载: " + post.title, "ok");
+    } catch (e) {
+      toast("下载启动失败: " + ((e as Error).message || ""), "info");
+    }
+  };
+
   return (
     <div className="absolute inset-0 bg-bg flex flex-col">
       <div className="shrink-0 flex items-center gap-2 px-2 bg-s1" style={{ paddingTop: isMobile ? "var(--sat, 0px)" : 0, height: isMobile ? "calc(44px + var(--sat, 0px))" : 44 }}>
@@ -138,9 +149,17 @@ export function PostDetail({ id, onBack, active = true }: { id: number; onBack: 
             </div>
             <div className="px-4 pt-3.5">
               <h1 className="text-[17px] font-bold text-on leading-snug">{post.title}</h1>
-              <div className="flex items-center gap-2 mt-2 text-[10.5px] text-mut">
-                <span>{post.publish_time || post.created_at}</span>
-                <span className="flex items-center gap-1"><IFireF size={10} />{fmt(post.hot)}</span>
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <div className="flex items-center gap-2 text-[10.5px] text-mut">
+                  <span>{post.publish_time || post.created_at}</span>
+                  <span className="flex items-center gap-1"><IFireF size={10} />{fmt(post.hot)}</span>
+                </div>
+                {post.video_url && (
+                  <button onClick={onDownload} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-s3 hover:bg-s4 text-[11px] font-medium text-on pressable">
+                    <IDownload size={13} />
+                    <span>下载视频</span>
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2.5">
                 {(post.tags || []).slice(0, 8).map((t) => (

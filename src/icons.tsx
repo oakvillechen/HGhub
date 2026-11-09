@@ -52,6 +52,7 @@ export const ILogout = S(<><path d="M14 4.5H7A2.5 2.5 0 0 0 4.5 7v10A2.5 2.5 0 0
 export const ILogin = S(<><path d="M10 4.5h7A2.5 2.5 0 0 1 19.5 7v10a2.5 2.5 0 0 1-2.5 2.5h-7" /><path d="m12 8 4 4-4 4" /><path d="M16 12H4.5" /></>);
 export const ITrash = S(<><path d="M4.5 6.5h15" /><path d="M8 6.5V5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 16 5v1.5" /><path d="M6.5 6.5 7.4 19a2 2 0 0 0 2 1.8h5.2a2 2 0 0 0 2-1.8l.9-12.5" /><path d="M10 10.5v6M14 10.5v6" /></>);
 export const IDownload = S(<><path d="M12 3.5V15" /><path d="m7.5 11 4.5 4.5L16.5 11" /><path d="M4.5 19.5h15" /></>);
+export const IFolder = S(<path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z" />);
 export const ILink = S(<><path d="M9.5 14.5 14.5 9.5" /><path d="M11 6.5 13 4.5a4 4 0 0 1 6.5 6.5l-2 2" /><path d="M13 17.5 11 19.5A4 4 0 0 1 4.5 13l2-2" /></>);
 export const IFlag = S(<><path d="M5.5 21V4" /><path d="M5.5 4.5c4-2.4 8 2.4 13 0v9c-5 2.4-9-2.4-13 0" /></>);
 export const IBan = S(<><circle cx="12" cy="12" r="8.5" /><path d="M6 6l12 12" /></>);
