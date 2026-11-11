@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmt } from "../api";
 import type { RankItem, VideoCard } from "../types";
 import { useStore } from "../store";
@@ -15,47 +15,109 @@ export default function Search({ active, wide }: { active: boolean; wide: boolea
   const [items, setItems] = useState<VideoCard[]>([]);
   const [page, setPage] = useState(0);
   const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [sort, setSort] = useState<"综合" | "最热" | "最新" | "高分">("综合");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
+  const pageRef = useRef(0);
+  const pagesRef = useRef(1);
+  const submittedRef = useRef("");
 
   useEffect(() => {
     if (active && !/Android/i.test(navigator.userAgent)) inputRef.current?.focus();
   }, [active]);
 
-  const run = async (keyword: string, p: number) => {
+  const PAGE_SIZE = 30;
+
+  const run = useCallback(async (keyword: string, p: number) => {
     if (busy.current) return;
-    if (p > pages && p > 1) return;
+    if (p > pagesRef.current && p > 1) return;
     busy.current = true;
-    setLoading(true);
+    if (p === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const res = await api.search(keyword, p, 20);
+      const res = await api.search(keyword, p, PAGE_SIZE);
+      const newItems = res?.items || [];
+      const totalPages = res?.pagination?.pages || 1;
+      const totalCount = res?.pagination?.total || (p === 1 ? newItems.length : total);
+
+      pageRef.current = p;
+      pagesRef.current = totalPages;
+      setPage(p);
+      setPages(totalPages);
+      if (res?.pagination?.total) setTotal(res.pagination.total);
+      else if (p === 1) setTotal(newItems.length);
+
       setItems((prev) => {
         const base = p === 1 ? [] : prev;
         const seen = new Set(base.map((x) => x.id));
-        return [...base, ...(res?.items || []).filter((x) => !seen.has(x.id))];
+        return [...base, ...newItems.filter((x) => !seen.has(x.id))];
       });
-      setPage(p);
-      setPages(res?.pagination?.pages || 1);
       setErr(null);
     } catch (e) {
       setErr((e as Error).message || "搜索失败");
     } finally {
-      busy.current = false;
-      setLoading(false);
+      window.setTimeout(() => {
+        busy.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }, 350);
     }
-  };
+  }, [total]);
 
-  const submit = (keyword: string) => {
+  const submit = useCallback((keyword: string) => {
     const k = keyword.trim();
     if (!k) return;
     setSubmitted(k);
+    submittedRef.current = k;
     addSearch(k);
     setItems([]);
+    setPage(0);
     setPages(1);
-    run(k, 1);
-  };
+    setTotal(0);
+    pageRef.current = 0;
+    pagesRef.current = 1;
+    void run(k, 1);
+  }, [addSearch, run]);
+
+  // 滚动到底部自动无限加载下一页
+  useEffect(() => {
+    const root = scrollRef.current;
+    const el = sentinel.current;
+    if (!root || !el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0]?.isIntersecting &&
+          !busy.current &&
+          submittedRef.current &&
+          pageRef.current < pagesRef.current
+        ) {
+          void run(submittedRef.current, pageRef.current + 1);
+        }
+      },
+      { root, rootMargin: "250px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [run]);
+
+  const sorted = useMemo(() => {
+    if (sort === "综合") return items;
+    return [...items].sort((a, b) => {
+      if (sort === "最热") return (b.hot || 0) - (a.hot || 0);
+      if (sort === "高分") return (b.score || 0) - (a.score || 0);
+      if (sort === "最新") return b.id - a.id;
+      return 0;
+    });
+  }, [items, sort]);
 
   const querying = submitted.length > 0;
 
@@ -68,7 +130,21 @@ export default function Search({ active, wide }: { active: boolean; wide: boolea
           <ISearch size={17} className="text-mut shrink-0" />
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索短剧、作者、题材…"
             className="flex-1 min-w-0 bg-transparent text-[13.5px] text-on placeholder-dim outline-none" />
-          {q && <button type="button" onClick={() => { setQ(""); setSubmitted(""); setItems([]); }} className="w-5 h-5 rounded-full bg-s4 flex items-center justify-center text-mut pressable"><IClose size={11} /></button>}
+          {q && (
+            <button
+              type="button"
+              onClick={() => {
+                setQ("");
+                setSubmitted("");
+                submittedRef.current = "";
+                setItems([]);
+                setTotal(0);
+              }}
+              className="w-5 h-5 rounded-full bg-s4 flex items-center justify-center text-mut pressable"
+            >
+              <IClose size={11} />
+            </button>
+          )}
         </form>
         <button onClick={() => push({ kind: "ranks" })} aria-label="排行榜"
           className="w-11 h-11 rounded-(--r-sm) flex items-center justify-center bg-primary text-on-primary pressable elev-2">
@@ -76,7 +152,7 @@ export default function Search({ active, wide }: { active: boolean; wide: boolea
         </button>
       </div>
 
-      <div className="flex-1 scroll-y px-4 pb-24">
+      <div ref={scrollRef} className="flex-1 scroll-y px-4 pb-24">
         {!querying ? (
           <>
             {searchHist.length > 0 && (
@@ -117,22 +193,70 @@ export default function Search({ active, wide }: { active: boolean; wide: boolea
           </>
         ) : (
           <>
-            <div className="text-[11.5px] text-mut mt-1 mb-2.5">「{submitted}」共 <span className="text-primary font-bold">{items.length}</span> 条结果</div>
-            {items.length ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-1 mb-3">
+              <div className="text-[12px] text-mut">
+                「{submitted}」共 <span className="text-primary font-bold">{total || items.length}</span> 部短剧
+                {pages > 1 && <span className="ml-1 text-[10.5px] text-dim">({page}/{pages} 页)</span>}
+              </div>
+              {items.length > 0 && (
+                <div className="flex bg-s3 rounded-lg p-0.5 text-[11px] font-medium shrink-0">
+                  {(["综合", "最热", "最新", "高分"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setSort(s)}
+                      className={`px-2.5 py-1 rounded-md transition-all pressable ${
+                        sort === s
+                          ? "bg-primary text-on-primary font-bold shadow-sm"
+                          : "text-mut hover:text-on"
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {sorted.length ? (
               <>
-                <Masonry videos={items} wide={wide} onOpen={(v) => push({ kind: "feed", videoIds: items.map((x) => x.id), index: items.findIndex((x) => x.id === v.id), title: `搜索 · ${submitted}` })} />
+                <Masonry
+                  videos={sorted}
+                  wide={wide}
+                  onOpen={(v) =>
+                    push({
+                      kind: "feed",
+                      videoIds: sorted.map((x) => x.id),
+                      index: sorted.findIndex((x) => x.id === v.id),
+                      title: `搜索 · ${submitted}`,
+                    })
+                  }
+                />
+                <div ref={sentinel} className="h-6 pointer-events-none" />
                 <div className="flex justify-center py-4">
-                  {loading ? <div className="w-6 h-6 spinner" />
-                    : page < pages ? (
-                      <button onClick={() => run(submitted, page + 1)} className="px-5 h-9 rounded-(--r-ctl) bg-s3 text-[12px] text-on/85 pressable">加载更多</button>
-                    ) : <span className="text-[10.5px] text-dim">— 已经到底啦 —</span>}
+                  {loadingMore ? (
+                    <div className="w-6 h-6 spinner" />
+                  ) : page < pages ? (
+                    <button
+                      onClick={() => run(submitted, page + 1)}
+                      className="px-5 h-9 rounded-(--r-ctl) bg-s3 text-[12px] text-on/85 pressable"
+                    >
+                      加载更多
+                    </button>
+                  ) : (
+                    <span className="text-[10.5px] text-dim">— 已经到底啦 —</span>
+                  )}
                 </div>
               </>
             ) : loading ? (
               <div className="flex justify-center py-12"><div className="w-8 h-8 spinner" /></div>
             ) : (
-              <Empty icon={<ISearch size={26} />} title={err || "没有找到相关内容"} sub="换个关键词试试，比如「都市」「逆袭」"
-                action="看看热榜" onAction={() => push({ kind: "ranks" })} />
+              <Empty
+                icon={<ISearch size={26} />}
+                title={err || "没有找到相关内容"}
+                sub="换个关键词试试，比如「都市」「逆袭」"
+                action="看看热榜"
+                onAction={() => push({ kind: "ranks" })}
+              />
             )}
           </>
         )}
