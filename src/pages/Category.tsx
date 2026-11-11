@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmt } from "../api";
 import type { Post, VideoCard } from "../types";
 import { useStore } from "../store";
@@ -160,46 +160,72 @@ export function ChannelPage({ cate, name, onBack, wide }: { cate: string; name: 
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
   const busy = useRef(false);
+  const pageRef = useRef(0);
+  const pagesRef = useRef(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
 
-  const loadMore = async () => {
-    if (busy.current || page >= pages) return;
+  const loadMore = useCallback(async () => {
+    if (busy.current || pageRef.current >= pagesRef.current) return;
     busy.current = true;
     setLoading(true);
     try {
-      const next = page + 1;
+      const next = pageRef.current + 1;
       const res = await api.category(cate, next, 20);
+      const newItems = res?.items || [];
+      const totalPages = res?.pagination?.pages || next;
+      pageRef.current = next;
+      pagesRef.current = totalPages;
+      setPage(next);
+      setPages(totalPages);
       setItems((prev) => {
         const seen = new Set(prev.map((x) => x.id));
-        return [...prev, ...(res?.items || []).filter((x) => !seen.has(x.id))];
+        return [...prev, ...newItems.filter((x) => !seen.has(x.id))];
       });
-      setPage(next);
-      setPages(res?.pagination?.pages || next);
       setErr(null);
     } catch (e) {
       setErr((e as Error).message || "加载失败");
     } finally {
-      busy.current = false;
-      setLoading(false);
+      // 保持 350ms 冷却时间，防止滚动过快或多次重入导致刷新死循环
+      window.setTimeout(() => {
+        busy.current = false;
+        setLoading(false);
+      }, 350);
     }
-  };
+  }, [cate]);
 
-  useEffect(() => { loadMore(); /* eslint-disable-next-line */ }, []);
   useEffect(() => {
+    void loadMore();
+  }, [loadMore]);
+
+  // 绑定 scroll 容器单例监听，避免因 page/pages 变动反复销毁并触发自激振荡
+  useEffect(() => {
+    const root = scrollRef.current;
     const el = sentinel.current;
-    if (!el) return;
-    const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadMore(); }, { rootMargin: "600px" });
+    if (!root || !el) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !busy.current && pageRef.current < pagesRef.current) {
+          void loadMore();
+        }
+      },
+      { root, rootMargin: "250px" }
+    );
     io.observe(el);
     return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pages]);
+  }, [loadMore]);
 
-  const sorted = [...items].sort((a, b) => {
-    if (sort === "最热") return (b.hot || 0) - (a.hot || 0);
-    if (sort === "高分") return (b.score || 0) - (a.score || 0);
-    return b.id - a.id;
-  });
+  const sorted = useMemo(() => {
+    if (sort === "最新") return items;
+    return [...items].sort((a, b) => {
+      if (sort === "最热") return (b.hot || 0) - (a.hot || 0);
+      if (sort === "高分") return (b.score || 0) - (a.score || 0);
+      return 0;
+    });
+  }, [items, sort]);
 
   return (
     <div className="absolute inset-0 bg-bg flex flex-col">
@@ -220,7 +246,7 @@ export function ChannelPage({ cate, name, onBack, wide }: { cate: string; name: 
           ))}
         </div>
       </div>
-      <div className="flex-1 scroll-y px-4 pt-3 pb-8">
+      <div ref={scrollRef} className="flex-1 scroll-y px-4 pt-3 pb-8">
         {sorted.length ? (
           <Masonry videos={sorted} wide={wide} onOpen={(v) => push({ kind: "feed", videoIds: sorted.map((x) => x.id), index: sorted.findIndex((x) => x.id === v.id), title: name })} />
         ) : err ? (
@@ -228,7 +254,7 @@ export function ChannelPage({ cate, name, onBack, wide }: { cate: string; name: 
         ) : (
           <div className="flex justify-center py-10"><div className="w-8 h-8 spinner" /></div>
         )}
-        <div ref={sentinel} className="h-10" />
+        <div ref={sentinel} className="h-6 pointer-events-none" />
         {loading && <div className="flex justify-center py-3"><div className="w-6 h-6 spinner" /></div>}
         {!loading && page >= pages && sorted.length > 0 && (
           <div className="text-center text-[10.5px] text-dim py-3">— 已经到底啦 —</div>

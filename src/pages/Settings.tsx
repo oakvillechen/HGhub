@@ -5,12 +5,12 @@ import { Modal, Toggle } from "../components/ui";
 import LinePicker from "../components/LinePicker";
 import { autoLineEnabled, pickLine, setAutoLine } from "../autoLine";
 import { copyPlaybackLog, initPlaybackLog, setPlaybackLog, usePlaybackLog } from "../playbackDiagnostics";
-import { IBack, IBoltF, IBroom, IChevR, IDownload, IHeart, IInfo, ILink, ILockF, IMoon, IRefresh, ISettings, ISun, IVolMute } from "../icons";
+import { IBack, IBoltF, IBroom, IChevR, IDownload, IGrid, IHeart, IInfo, ILink, ILockF, IMoon, IRefresh, ISettings, ISun, IVolMute } from "../icons";
 
 /* 独立设置页：线路 / 外观 / 播放 / 本地数据 / 清理缓存 / 网络诊断 / 关于
    入口：Windows 侧栏「设置」、Android「我的」右上角齿轮 */
 export default function Settings({ onBack, wide }: { onBack: () => void; wide: boolean }) {
-  const { theme, setTheme, favs, history, muteOnStartup, setMuteOnStartup, strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity, toast } = useStore();
+  const { theme, setTheme, favs, history, muteOnStartup, setMuteOnStartup, startupTab, setStartupTab, strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity, toast } = useStore();
   const [about, setAbout] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -101,6 +101,35 @@ export default function Settings({ onBack, wide }: { onBack: () => void; wide: b
                 <div className="text-[10.5px] text-mut">跟随设计稿的 Fluent 深色</div>
               </div>
               <Toggle on={theme === "dark"} onChange={(on) => setTheme(on ? "dark" : "light")} label="深色外观" />
+            </div>
+          </Section>
+
+          <Section title="常规">
+            <div className="flex items-center gap-3 px-3.5 py-3">
+              <span className="w-8 h-8 rounded-full bg-s3 flex items-center justify-center text-primary"><IGrid size={16} /></span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12.5px] text-on">启动默认进入</div>
+                <div className="text-[10.5px] text-mut">打开应用时首屏展示的页面</div>
+              </div>
+              <div className="flex bg-s3 rounded-lg p-0.5 text-[11px] font-medium shrink-0">
+                {([
+                  { k: "category", label: "分类" },
+                  { k: "home", label: "首页" },
+                  { k: "remember", label: "上次页面" },
+                ] as const).map(({ k, label }) => (
+                  <button
+                    key={k}
+                    onClick={() => setStartupTab(k)}
+                    className={`px-2.5 py-1 rounded-md transition-all ${
+                      startupTab === k
+                        ? "bg-primary text-on-primary font-bold shadow-sm"
+                        : "text-mut hover:text-on"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </Section>
 

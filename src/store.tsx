@@ -48,6 +48,8 @@ export type Toast = {
 /** 观看记录：看到第几集、第几秒（`dur` 用来判断是否已看完） */
 export type WatchProgress = { id: number; ep: number; t: number; dur: number; at: number };
 
+export type StartupTab = "category" | "home" | "remember";
+
 type Persist = {
   likes: number[];
   favs: number[];
@@ -57,12 +59,16 @@ type Persist = {
   muteOnStartup: boolean;
   volume: number;
   searchHist: string[];
+  startupTab: StartupTab;
+  lastTab: Tab;
 };
 
 const LS = "hghub_app_v1";
 const DEFAULTS: Persist = {
   likes: [], favs: [], history: [], follows: [],
   muted: true, muteOnStartup: true, volume: 0.7, searchHist: [],
+  startupTab: "category",
+  lastTab: "category",
 };
 
 /** 旧版本 history 是 number[]，读出来时升级成带进度的结构 */
@@ -89,7 +95,14 @@ function loadPersist(): Persist {
     const p = { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Persist>) };
     // 只在启动时应用；本次使用中取消静音不会关闭此偏好。
     const muteOnStartup = p.muteOnStartup !== false;
-    return { ...p, muteOnStartup, muted: muteOnStartup || p.muted === true, history: normalizeHistory(p.history) };
+    return {
+      ...p,
+      startupTab: p.startupTab || "category",
+      lastTab: p.lastTab || "category",
+      muteOnStartup,
+      muted: muteOnStartup || p.muted === true,
+      history: normalizeHistory(p.history),
+    };
   } catch {
     return DEFAULTS;
   }
@@ -112,6 +125,7 @@ type Store = {
   platform: Platform;
   theme: Theme; setTheme: (t: Theme) => void;
   tab: Tab; setTab: (t: Tab) => void;
+  startupTab: StartupTab; setStartupTab: (st: StartupTab) => void;
   stack: Page[]; push: (p: PageInput) => void; pop: () => void;
   user: User | null; setUser: (u: User | null) => void;
   loginOpen: boolean; setLoginOpen: (b: boolean) => void;
@@ -143,7 +157,9 @@ let seq = 0;
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [p, setP] = useState<Persist>(loadPersist);
   const [theme, setThemeState] = useState<Theme>(readTheme);
-  const [tab, setTabRaw] = useState<Tab>("home");
+  const [tab, setTabRaw] = useState<Tab>(() => {
+    return p.startupTab === "remember" ? (p.lastTab || "category") : (p.startupTab || "category");
+  });
   const [stack, setStack] = useState<Page[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -220,7 +236,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("hg:line-changed", bump);
   }, []);
 
-  const setTab = useCallback((t: Tab) => { setTabRaw(t); setStack([]); }, []);
+  const setTab = useCallback((t: Tab) => {
+    setTabRaw(t);
+    setP((s) => ({ ...s, lastTab: t }));
+    setStack([]);
+  }, []);
+  const setStartupTab = useCallback((st: StartupTab) => {
+    setP((s) => ({ ...s, startupTab: st }));
+  }, []);
   const push = useCallback((pg: PageInput) => {
     setStack((s) => [...s, { ...pg, key: `p${++seq}` } as Page]);
   }, []);
@@ -302,6 +325,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     platform: envPlatform,
     theme, setTheme: setThemeState,
     tab, setTab, stack, push, pop,
+    startupTab: p.startupTab, setStartupTab,
     user, setUser, loginOpen, setLoginOpen, logout,
     likes: p.likes, favs: p.favs, history: p.history, follows: p.follows,
     isLiked: (id) => p.likes.includes(id),
@@ -315,6 +339,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }), [theme, tab, setTab, stack, push, pop, user, loginOpen, logout,
     p, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, addHistory, clearHistory,
     setMuted, setMuteOnStartup, setVolume, addSearch, clearSearchHist, strictSecurity, strictSecurityReady, securityPending, cliRelaxed, setStrictSecurity,
+    setStartupTab,
     toasts, toast, lineEpoch, theater, setTheater, fs, setFs]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

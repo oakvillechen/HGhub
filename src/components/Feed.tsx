@@ -11,7 +11,7 @@ import { setBackHandler } from "../back";
 import { triggerBatchDownload, triggerDownload } from "./DownloadManager";
 import {
   IBack, IBoltF, IChevR, IChevronDown, IChevronUp, IClose, ICommentF, ICompress, IDownload, IExpand, IFileText, IHeart, IHeartF,
-  ILink, IList, ILockF, IPauseF, IPlayF, ISearch, IStar, IStarF, IVol, IVolMute,
+  ILink, IList, ILockF, IPauseF, IPlayF, IRefresh, ISearch, IStar, IStarF, IVol, IVolMute,
 } from "../icons";
 
 type Props = {
@@ -24,6 +24,8 @@ type Props = {
   bottomInset: number;
   onBack?: () => void;
   onNearEnd?: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
   /** 从观看记录续播：起始集数与秒数 */
   startEp?: number;
   startTime?: number;
@@ -33,7 +35,7 @@ const RATES = [1, 1.25, 1.5, 2];
 
 const stripHtml = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
-export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind = "video", active, bottomInset, onBack, onNearEnd, startEp, startTime }: Props) {
+export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind = "video", active, bottomInset, onBack, onNearEnd, onRefresh, refreshing, startEp, startTime }: Props) {
   const store = useStore();
   const { isLiked, isFav, toggleLikeLocal, toggleFavLocal, toggleFollowLocal, muted, setMuted, volume, setVolume, toast, addHistory, user, setLoginOpen } = store;
   const isDesktop = !isMobile;
@@ -645,6 +647,27 @@ export default function Feed({ videoIds, startIndex = 0, title = "", mode, kind 
                     <span className="ml-auto px-2 py-0.5 rounded-full hg-chip text-[11px] font-semibold" style={{ color: "rgba(255,255,255,.9)" }}>{index + 1} / {videoIds.length}</span>
                   </div>
                 )
+              ) : null}
+
+              {!fs && mode === "home" && onRefresh ? (
+                <div
+                  className="absolute z-20 flex items-center gap-2"
+                  style={
+                    isDesktop
+                      ? { top: 12, right: 14 }
+                      : { top: "calc(var(--sat, 0px) + 8px)", right: 12 }
+                  }
+                >
+                  <button
+                    onClick={onRefresh}
+                    disabled={refreshing}
+                    title="换一批推荐"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/55 backdrop-blur-md text-[12px] font-semibold text-white/95 hover:bg-black/80 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50 ring-1 ring-white/10 pressable"
+                  >
+                    <IRefresh size={13} className={refreshing ? "animate-spin" : ""} />
+                    <span>换一批</span>
+                  </button>
+                </div>
               ) : null}
 
               {/* 右侧操作栏（移动端）：收藏 / 评论 / 全屏 / 分享

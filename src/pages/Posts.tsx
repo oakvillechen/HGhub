@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, cover, fmt, isMobile } from "../api";
 import type { Post } from "../types";
 import { useStore } from "../store";
@@ -15,37 +15,54 @@ export function PostsPage({ onBack, wide }: { onBack: () => void; wide: boolean 
   const [page, setPage] = useState(0);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
+
   const busy = useRef(false);
+  const pageRef = useRef(0);
+  const pagesRef = useRef(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
 
-  const loadMore = async () => {
-    if (busy.current || page >= pages) return;
+  const loadMore = useCallback(async () => {
+    if (busy.current || pageRef.current >= pagesRef.current) return;
     busy.current = true;
     setLoading(true);
     try {
-      const next = page + 1;
+      const next = pageRef.current + 1;
       const res = await api.posts(next, 20);
+      const newItems = res?.items || [];
+      const totalPages = res?.pagination?.pages || next;
+      pageRef.current = next;
+      pagesRef.current = totalPages;
+      setPage(next);
+      setPages(totalPages);
       setItems((prev) => {
         const seen = new Set(prev.map((x) => x.id));
-        return [...prev, ...(res?.items || []).filter((x) => !seen.has(x.id))];
+        return [...prev, ...newItems.filter((x) => !seen.has(x.id))];
       });
-      setPage(next);
-      setPages(res?.pagination?.pages || next);
     } catch { /* ignore */ } finally {
-      busy.current = false;
-      setLoading(false);
+      window.setTimeout(() => {
+        busy.current = false;
+        setLoading(false);
+      }, 350);
     }
-  };
+  }, []);
 
-  useEffect(() => { loadMore(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { void loadMore(); }, [loadMore]);
   useEffect(() => {
+    const root = scrollRef.current;
     const el = sentinel.current;
-    if (!el) return;
-    const io = new IntersectionObserver((es) => { if (es[0].isIntersecting) loadMore(); }, { rootMargin: "600px" });
+    if (!root || !el) return;
+    const io = new IntersectionObserver(
+      (es) => {
+        if (es[0]?.isIntersecting && !busy.current && pageRef.current < pagesRef.current) {
+          void loadMore();
+        }
+      },
+      { root, rootMargin: "250px" }
+    );
     io.observe(el);
     return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pages]);
+  }, [loadMore]);
 
   return (
     <div className="absolute inset-0 bg-bg flex flex-col">
@@ -54,12 +71,12 @@ export function PostsPage({ onBack, wide }: { onBack: () => void; wide: boolean 
         <span className="text-[14px] font-bold text-on">黄果吃瓜</span>
         <span className="text-[10.5px] text-mut ml-1">圈内爆料</span>
       </div>
-      <div className="flex-1 scroll-y px-3 pt-3 pb-8">
+      <div ref={scrollRef} className="flex-1 scroll-y px-3 pt-3 pb-8">
         {items.length ? (
-          <div className={`${wide ? "columns-3 xl:columns-4" : "columns-2"} gap-2`}>
+          <div className={`grid ${wide ? "grid-cols-3 xl:grid-cols-4" : "grid-cols-2"} gap-2`}>
             {items.map((p) => (
               <button key={p.id} onClick={() => push({ kind: "post", id: p.id })}
-                className="w-full break-inside-avoid mb-2 relative rounded-(--r-sm) overflow-hidden bg-s1 elev-1 pressable block"
+                className="w-full relative rounded-(--r-sm) overflow-hidden bg-s1 elev-1 pressable block"
                 style={{ paddingTop: "128%" }}>
                 <Img src={p.cover} />
                 <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
@@ -77,8 +94,11 @@ export function PostsPage({ onBack, wide }: { onBack: () => void; wide: boolean 
         ) : (
           <Empty icon={<IFireF size={26} />} title="暂无吃瓜内容" sub="稍后再来看看" />
         )}
-        <div ref={sentinel} className="h-10" />
+        <div ref={sentinel} className="h-6 pointer-events-none" />
         {loading && <div className="flex justify-center py-2"><div className="w-6 h-6 spinner" /></div>}
+        {!loading && page >= pages && items.length > 0 && (
+          <div className="text-center text-[10.5px] text-dim py-3">— 已经到底啦 —</div>
+        )}
       </div>
     </div>
   );
